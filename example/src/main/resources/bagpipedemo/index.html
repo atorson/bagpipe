@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+
+<html>
+<head>
+    <title>BAGPIPE EXAMPLE DEMO</title>
+    <link rel="shortcut icon" href="/demo/images/favicon.ico" type="image/x-icon">
+    <link href="/demo/lib/c3/c3.css" rel="stylesheet" type="text/css">
+    <script src="/demo/lib/crafty-min.js"></script>
+    <script src="/demo/lib/d3/d3.min.js" charset="utf-8"></script>
+    <script src="/demo/lib/c3/c3.min.js"></script>
+</head>
+<body>
+<p>BAGPIPE EXAMPLE DEMO</p>
+<div style = "float: left; " id="game"></div>
+<div style = "float: left; " id="chart"></div>
+<script>
+      var chart = null;
+      Crafty.init(1100, 900, document.getElementById('game'));
+      var url = location.protocol+'//'+location.hostname+(location.port ? ':'+location.port:'') + '/TripStatePosition/Stream';
+      var source = new EventSource(url);
+      var url1 = location.protocol+'//'+location.hostname+(location.port ? ':'+location.port:'') + '/Statistic/Stream';
+      var source1 = new EventSource(url1);
+      var tilesColor = new Map();
+      var lastCarTripMap = new Map();
+      var tilesCarText = new Map();
+      var tilesOrigText = new Map();
+      var tilesDestText = new Map();
+      var tilesPosText = new Map();
+      var idleCarTiles = new Map();
+      var drivingCarTiles = new Map();
+      var carryingCarTiles = new Map();
+      var tripOrigTiles = new Map();
+      var tripDestTiles = new Map();
+      var carCounters = new Map()
+
+      function redrawChart(){
+        var counterValues = [];
+        var xValues = [];
+        xValues.push('x');
+        var groupValues = [];
+        var groups = [];
+        var shouldRedraw = true;
+        var xValuesPushed = false;
+        var size = -1;
+        for (var [group, subMap] of carCounters){
+          if (size >0 && size != subMap.size) {
+            shouldRedraw = false;
+            break;
+          } else {
+              size = subMap.size;
+              var row = [];
+              row.push(group);
+              groups.push(group);
+              var subMapSorted = new Map([...subMap.entries()].sort((a,b) => a[0] > b[0]));
+              for (var [car, value] of subMapSorted){
+                 if (!xValuesPushed){
+                   xValues.push(car);
+                 }
+                 row.push(value/(60*1000));
+              }
+              if (!xValuesPushed){
+                counterValues.push(xValues);
+                xValuesPushed = true;
+              }
+              counterValues.push(row);
+          }
+        }
+        groupValues.push(groups);
+        if (shouldRedraw) {
+             if (!chart){
+               chart = c3.generate({
+                bindto: '#chart',
+                size: {
+                  width: 500,
+                  height: 300
+                },
+                padding: {
+                  left: 50
+                },
+                title: {
+                   text: 'Accumulated time, minutes'
+                },
+                data: {
+                  x: 'x',
+                  type: 'bar',
+                  columns: counterValues,
+                  groups: groupValues
+                },
+                axis: {
+                    x: {
+                        type: 'category'
+                    }
+                }
+              });
+             } else {
+                 chart.load({
+                   columns: counterValues
+                 });
+                 chart.groups(groupValues);
+             }
+         }
+      }
+
+      function clearAndRedraw(map, id){
+         var locID = map.get(id);
+         if (locID) {
+           map.delete(id);
+           redrawTile(locID);
+         }
+      }
+
+      function greyOutTile(map, id){
+         var locID = map.get(id);
+         if (locID) {
+            var tileColor = tilesColor.get(locID);
+            if (tileColor){
+             Crafty(tileColor).color("silver");
+            }
+         }
+      }
+
+      function redrawTile(locID) {
+           createTile(locID);
+           var tileColor = tilesColor.get(locID);
+           var tileCarText = tilesCarText.get(locID);
+           var tileOrigText = tilesOrigText.get(locID);
+           var tileDestText = tilesDestText.get(locID);
+           var tilePosText = tilesPosText.get(locID);
+           if (tileColor && tileCarText && tileOrigText && tileDestText && tilePosText ){
+               var colorValue = "white";
+               var textValue = "";
+               for (var [key, value] of idleCarTiles) {
+                 if (value == locID) {
+                   textValue += (key + " ");
+                   if (colorValue == "white") {
+                     colorValue = "silver";
+                   } else {
+                     colorValue = "orange";
+                   }
+                 }
+               }
+               for (var [key, value] of drivingCarTiles) {
+                 if (value == locID) {
+                   textValue += (key + " ");
+                   if (colorValue == "white") {
+                     colorValue = "rgba(0,255,0,0.3)";
+                   } else {
+                     colorValue = "orange";
+                   }
+                 }
+               }
+               for (var [key, value] of carryingCarTiles) {
+                 if (value == locID) {
+                   textValue += (key + " ");
+                   if (colorValue == "white") {
+                     colorValue = "green";
+                   } else {
+                     colorValue = "orange";
+                   }
+                 }
+               }
+               Crafty(tileCarText).text(textValue);
+               Crafty(tileColor).color(colorValue);
+               if (colorValue == "green") {
+                 Crafty(tileCarText).css({'border-style': 'solid', 'border-width': '2px'});
+               } else {
+                 Crafty(tileCarText).css({'border-style': 'hidden', 'border-width': '2px'});
+               }
+               textValue = "";
+               for (var [key, value] of tripOrigTiles) {
+                 if (value == locID) {
+                    textValue += (key + " ");
+                 }
+               }
+               Crafty(tileOrigText).text(textValue);
+               if (textValue != "") {
+                 Crafty(tileOrigText).css({'border-style': 'solid', 'border-width': '2px'});
+               } else {
+                 Crafty(tileOrigText).css({'border-style': 'hidden', 'border-width': '2px'});
+               }
+               textValue = "";
+               for (var [key, value] of tripDestTiles) {
+                 if (value == locID) {
+                    textValue += (key + " ");
+                 }
+               }
+               Crafty(tileDestText).text(textValue);
+           }
+      }
+
+      function createTile(locID){
+         if (tilesColor.get(locID) && tilesCarText.get(locID) && tilesOrigText.get(locID) && tilesDestText.get(locID) && tilesPosText.get(locID)) {
+         } else {
+           var locIDsplit = locID.split(":");
+           var xPos = locIDsplit[1];
+           var yPos = locIDsplit[2];
+           var tileColor = Crafty.e('2D, DOM, Color').attr({x: 100*xPos + 5, y: 80*yPos + 25, w: 93, h: 40, z: 1}).css({'border-radius': '5px'});
+           var tileCarText = Crafty.e('2D, DOM, Text').attr({x: 100*xPos + 5, y: 80*yPos + 40, w: 90, h: 10, z: 2}).textFont({ weight: 'bold'});
+           var tileOrigText = Crafty.e('2D, DOM, Text').attr({x: 100*xPos + 5, y: 80*yPos + 5, w: 90, h: 10, z: 3}).textColor('blue').textFont({ weight: 'bold'});
+           var tileDestText = Crafty.e('2D, DOM, Text').attr({x: 100*xPos + 5, y: 80*yPos + 20, w: 90, h: 10, z: 4}).textColor('blue').textFont({ weight: 'bold'});
+           var tilePosText = Crafty.e('2D, DOM, Text').attr({x: 100*xPos + 5 , y: 80*yPos + 70, w: 90, h: 10, z: 5}).text(xPos + ":" + yPos).textColor('silver').textFont({ size: '8px'});
+           var tileBorder = Crafty.e('2D, DOM, Text').attr({x: 100*xPos + 2, y: 80*yPos +2, w: 96, h: 76, z: 6}).css({'border-style': 'dashed', 'border-radius': '5px', 'border-width': '1px', 'border-color' : 'LightGrey'});
+           tilesColor.set(locID, tileColor[0]);
+           tilesCarText.set(locID, tileCarText[0]);
+           tilesOrigText.set(locID, tileOrigText[0]);
+           tilesDestText.set(locID, tileDestText[0]);
+           tilesPosText.set(locID, tilePosText[0]);
+           redrawTile(locID);
+         }
+      }
+
+      source.addEventListener('TripStatePosition', function(event) {
+              //console.log(event);
+              var obj = JSON.parse(event.data);
+              var state = obj.tripStateEntity;
+              var positionID = obj.carLocationKey || obj.carLocationEntity.namekey;
+              if (state && positionID){
+                var carID = state.carKey || state.carEntity.namekey;
+                var tripID = state.tripEntity.namekey || state.tripKey;
+                var status = state.status;
+                if (carID && tripID && status){
+                     var lastTripID = lastCarTripMap.get(carID) || tripID;
+                     var lastID = carID + "->" + lastTripID;
+                     var currentID = carID + "->" + tripID;
+                     lastCarTripMap.set(carID, tripID);
+                     clearAndRedraw(idleCarTiles, lastID);
+                     clearAndRedraw(drivingCarTiles, lastID);
+                     clearAndRedraw(carryingCarTiles, lastID);
+                     if (status == "Driving") {
+                       drivingCarTiles.set(currentID, positionID);
+                       if (tripOrigTiles.get(tripID)){
+                       } else {
+                         var tripEntity = state.tripEntity;
+                         var origID = tripEntity.originKey || tripEntity.originEntity.namekey;
+                         tripOrigTiles.set(tripID, origID);
+                         redrawTile(origID);
+                       }
+                     } else if (status == "Carrying") {
+                       carryingCarTiles.set(currentID, positionID);
+                       clearAndRedraw(tripOrigTiles, tripID);
+                       if (tripDestTiles.get(tripID)){
+                       } else {
+                         var tripEntity = state.tripEntity;
+                         var destID = tripEntity.destinationKey || tripEntity.destinationEntity.namekey;
+                         tripDestTiles.set(tripID, destID);
+                         redrawTile(destID);
+                       }
+                     } else if (status == "Completed") {
+                       idleCarTiles.set(currentID, positionID);
+                       clearAndRedraw(tripDestTiles, tripID);
+                     }
+                     redrawTile(positionID);
+                }
+              }
+      });
+      source1.addEventListener('Statistic', function(event) {
+              console.log(event);
+              var obj = JSON.parse(event.data);
+              var status = obj.status;
+              var splitVal = obj.namekey.split(':');
+              var carID = splitVal[1].split('/')[0];
+              var groupID = splitVal[0];
+              var value = obj.currentValue;
+              if (status == 'Finalized') {
+                 var lastID = carID + "->" + lastCarTripMap.get(carID);
+                 greyOutTile(idleCarTiles, lastID);
+                 greyOutTile(drivingCarTiles, lastID);
+                 greyOutTile(carryingCarTiles, lastID);
+              } else {
+                 if(!carCounters.has(groupID)){
+                   carCounters.set(groupID, new Map());
+                 }
+                 carCounters.get(groupID).set(carID, value);
+                 redrawChart();
+              }
+      });
+    </script>
+</body>
+</html>

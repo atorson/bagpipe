@@ -1,0 +1,25 @@
+{
+  "name": {
+    "fullName": "net.andrewtorson.bagpipe.entities.Location"
+  },
+  "comment": "Location entity",
+  "fields": [
+    {
+      "name": "namekey",
+      "valueType": {
+        "fullName": "String"
+      }
+    },
+    {
+      "name": "x",
+      "valueType": {
+        "fullName": "Int"
+      }
+    },
+    {
+      "name": "y",
+      "valueType": {
+        "fullName": "Int"
+      }
+    }]
+}

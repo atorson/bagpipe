@@ -1,0 +1,26 @@
+{
+  "name": {
+    "fullName": "net.andrewtorson.bagpipe.entities.TripStatePosition"
+  },
+  "comment": "TripStatePosition entity",
+  "fields": [
+    {
+      "name": "namekey",
+      "valueType": {
+        "fullName": "String"
+      }
+    },
+    {
+      "name": "tripState",
+      "valueType": {
+        "fullName": "TripStateEntity"
+      }
+    },
+    {
+      "name": "carLocation",
+      "valueType": {
+        "fullName": "LocationEntity"
+      }
+    }
+  ]
+}

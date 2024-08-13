@@ -1,0 +1,43 @@
+syntax = "proto2";
+
+import "scalapb/scalapb.proto";
+
+option(scalapb.options) = {
+ package_name: "net.andrewtorson.bagpipe.entities"
+ flat_package: true
+ single_file: true
+ import: "net.andrewtorson.bagpipe.utils.{BaseEntity}"
+};
+
+message Timestamp {
+    required int64 millis = 1;
+}
+
+
+message Audit {
+    option (scalapb.message).extends = "BaseEntity[Audit]";
+    option (scalapb.message).extends = "AuditEntity";
+    required string namekey = 1;
+    required Timestamp crt = 2;
+    required Timestamp upd = 3;
+    required int32 ver = 4;
+}
+
+message Statistic {
+    option (scalapb.message).extends = "BaseEntity[Statistic]";
+    option (scalapb.message).extends = "StatisticEntity";
+    required string namekey = 1 ;
+    oneof audit {
+        Audit auditEntity = 2;
+        string auditKey = 3;
+    }
+    required string family = 4;
+    required Timestamp timeFrom = 5;
+    required Timestamp timeTo = 6;
+    required double currentValue = 7;
+    enum StatisticStatus {
+        Ongoing = 1;
+        Finalized = 2;
+    }
+    required StatisticStatus status = 8;
+}

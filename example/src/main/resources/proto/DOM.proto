@@ -1,0 +1,144 @@
+syntax = "proto2";
+
+import "scalapb/scalapb.proto";
+import "Common.proto";
+
+option(scalapb.options) = {
+ package_name: "net.andrewtorson.bagpipe.entities"
+ flat_package: true
+ single_file: true
+ import: "net.andrewtorson.bagpipe.utils.{BaseEntity}"
+};
+
+message Car {
+    option (scalapb.message).extends = "BaseEntity[Car]";
+    option (scalapb.message).extends = "CarEntity";
+    required string namekey = 1 ;
+    oneof audit {
+        Audit auditEntity = 2;
+        string auditKey = 3;
+    }
+    oneof lastKnownState {
+        TripState lastKnownStateEntity = 4;
+        string lastKnownStateKey = 5;
+    }
+    enum CarStatus {
+        Idle = 1;
+        Busy = 2;
+    }
+    required CarStatus status = 6;
+}
+
+message Location {
+    option (scalapb.message).extends = "BaseEntity[Location]";
+    option (scalapb.message).extends = "LocationEntity";
+    required string namekey = 1 ;
+    required int32 x = 2;
+    required int32 y = 3;
+}
+
+message Trip {
+   option (scalapb.message).extends = "BaseEntity[Trip]";
+   option (scalapb.message).extends = "TripEntity";
+   required string namekey = 1 ;
+   oneof audit {
+     Audit auditEntity = 2;
+     string auditKey = 3;
+   }
+   oneof origin {
+       Location originEntity = 4;
+       string originKey = 5;
+   }
+   oneof destination {
+       Location destinationEntity = 6;
+       string destinationKey = 7;
+   }
+   oneof currentState {
+       TripState currentStateEntity = 8;
+       string currentStateKey = 9;
+   }
+   enum TripStatus {
+       Planned = 1;
+       Underway = 2;
+       Completed = 3;
+   }
+   required TripStatus status = 10;
+}
+
+message TripState {
+    option (scalapb.message).extends = "BaseEntity[TripState]";
+    option (scalapb.message).extends = "TripStateEntity";
+    required string namekey = 1 ;
+    oneof audit {
+        Audit auditEntity = 2;
+        string auditKey = 3;
+    }
+    oneof trip {
+        Trip tripEntity = 4;
+        string tripKey = 5;
+    }
+    oneof car {
+        Car carEntity = 6;
+        string carKey = 7;
+    }
+    oneof triggerAction {
+        TripAction triggerActionEntity = 8;
+        string triggerActionKey = 9;
+    }
+    oneof currentPosition {
+        TripStatePosition currentPositionEntity = 10;
+        string currentPositionKey = 11;
+    }
+    enum TripStateStatus {
+        Undefined = 1;
+        Assigned = 2;
+        Driving = 3;
+        Carrying = 4;
+        Completed = 5;
+    }
+    required TripStateStatus status = 12;
+}
+
+message TripAction {
+    option (scalapb.message).extends = "BaseEntity[TripAction]";
+    option (scalapb.message).extends = "TripActionEntity";
+    required string namekey = 1 ;
+    oneof audit {
+        Audit auditEntity = 2;
+        string auditKey = 3;
+    }
+    oneof trip {
+        Trip tripEntity = 4;
+        string tripKey = 5;
+    }
+    oneof car {
+        Car carEntity = 6;
+        string carKey = 7;
+    }
+    oneof triggerState {
+        TripState triggerStateEntity = 8;
+        string triggerStateKey = 9;
+    }
+    enum TripActionStatus {
+        Undefined = 1;
+        Receive = 2;
+        Deliver = 3;
+        Finish = 4;
+    }
+    required TripActionStatus status = 10;
+}
+
+message TripStatePosition {
+   option (scalapb.message).extends = "BaseEntity[TripStatePosition]";
+   option (scalapb.message).extends = "TripStatePositionEntity";
+   required string namekey = 1 ;
+
+   oneof tripState {
+       TripState tripStateEntity = 2;
+       string tripStateKey = 3;
+   }
+   oneof carLocation {
+       Location carLocationEntity = 4;
+       string carLocationKey = 5;
+   }
+}

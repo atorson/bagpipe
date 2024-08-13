@@ -1,0 +1,44 @@
+{
+  "name": {
+    "fullName": "net.andrewtorson.bagpipe.entities.Trip"
+  },
+  "comment": "Trip entity",
+  "fields": [
+    {
+      "name": "namekey",
+      "valueType": {
+        "fullName": "String"
+      }
+    },
+    {
+      "name": "audit",
+      "valueType": {
+        "fullName": "AuditEntity"
+      }
+    },
+    {
+      "name": "origin",
+      "valueType": {
+        "fullName": "LocationEntity"
+      }
+    },
+    {
+      "name": "destination",
+      "valueType": {
+        "fullName": "LocationEntity"
+      }
+    },
+    {
+      "name": "currentState",
+      "valueType": {
+        "fullName": "TripStateEntity"
+      }
+    },
+    {
+      "name": "status",
+      "valueType": {
+        "fullName": "TripStatusEnum"
+      }
+    }
+  ]
+}

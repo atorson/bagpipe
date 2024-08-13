@@ -1,0 +1,369 @@
+@(schema: net.andrewtorson.bagpipe.gen.TypeSchema)
+
+@addComma(index: Any) = @{
+  if(index.asInstanceOf[Int] < schema.fields.size - 1) ", "  else ""
+}
+
+@isEnum(field: Any) = @{
+  field.asInstanceOf[Field].valueType.fullName.endsWith("Enum")
+}
+@isEntity(field: Any) = @{
+  field.asInstanceOf[Field].valueType.fullName.endsWith("Entity")
+}
+
+@isAudit(field: Any) = @{
+ isEntity(field) &&
+ field.asInstanceOf[Field].valueType.fullName.capitalize.startsWith("Audit")
+}
+
+@isNamekey(field: Any) = @{
+  field.asInstanceOf[Field].name.capitalize == "Namekey"
+}
+
+@isAuditable() = @{
+   schema.fields.filter(isAudit(_)).headOption.isDefined
+}
+
+@lname(field: Any) = @{
+  field.asInstanceOf[Field].name
+}
+
+@name(field: Any) = @{
+  field.asInstanceOf[Field].name.capitalize
+}
+
+@stripSuffix(field:Any) = @{
+ field.asInstanceOf[Field].valueType.fullName.stripSuffix("Enum").stripSuffix("Entity")
+}
+
+
+@definition = {@(schema.name.shortName.capitalize)Def}
+@crud = {@(schema.name.shortName.capitalize)CRUD}
+@rest = {@(schema.name.shortName.capitalize)REST}
+@io = {@(schema.name.shortName.capitalize)IO}
+@mq = {@(schema.name.shortName.capitalize)MQ}
+@entity = {@(schema.name.shortName.capitalize)Entity}
+@proto = {@(schema.name.shortName.capitalize)}
+
+
+@import _root_.net.andrewtorson.bagpipe.gen.TwirlPersistentEntityGenerator
+@import _root_.net.andrewtorson.bagpipe.gen.TypeSchema
+@import _root_.net.andrewtorson.bagpipe.gen.Field
+
+
+package net.andrewtorson.bagpipe.entities
+
+
+import scala.reflect.ClassTag
+import net.andrewtorson.bagpipe.utils._
+import scala.concurrent.{ExecutionContext, Future}
+import akka.Done
+import net.andrewtorson.bagpipe.persistence.CRUD
+import net.andrewtorson.bagpipe.eventbus.EventBusEntityID
+import net.andrewtorson.bagpipe.ApplicationService
+import io.swagger.annotations._
+import javax.ws.rs.Path
+import net.andrewtorson.bagpipe.rest.REST
+import net.andrewtorson.bagpipe.networking.IO
+import net.andrewtorson.bagpipe.messaging.MQ
+
+
+
+/**
+ * @schema.comment
+ */
+
+object @definition extends EntityDefinition[@proto]{
+
+  override def tag = ClassTag(classOf[@proto])
+  override def companion = @proto
+  override def categoryID = EventBusEntityID(EventBusEntityID.EntityCategory, "@proto")
+  @for((field, index) <- schema.fields.zipWithIndex){
+     @if(isEnum(field)) {
+         val @(name(field))  = new EnumFieldDefinition {
+             override type V = @(proto).@(stripSuffix(field))
+             override def set(entity: @(proto), value: @(proto).@(stripSuffix(field))): @(proto)= {
+                entity.with@(name(field))(value)
+             }
+             override def get(entity: @(proto)): @(proto).@(stripSuffix(field)) = {
+                entity.@(lname(field))
+             }
+             override val descriptor = companion.descriptor.findFieldByName("@(lname(field))")
+             override val vtag = ClassTag[@(proto).@(stripSuffix(field))](classOf[@(proto).@(stripSuffix(field))])
+           }
+
+     } else {
+        @if(isEntity(field)) {
+           val @(name(field)) = new NestedFieldDefinition {
+
+              override type Sub = @(stripSuffix(field))
+              override val subentityDefinition = @(stripSuffix(field))Def
+
+              override def set(entity: @proto, value: OneOf[@(stripSuffix(field))]): @proto = value match {
+                case KeyOneOf(key) => entity.with@(name(field))Key(key)
+                case EntityOneOf(ent) => entity.with@(name(field))Entity(ent)
+              }
+
+              override def get(entity: @proto): OneOf[@(stripSuffix(field))] = {
+                val v = entity.@(lname(field))
+                if (!v.isDefined) throw new IllegalStateException(s"Required sub-entity @name(field) is empty")
+                if (v.is@(name(field))Key) KeyOneOf(v.@(lname(field))Key.get)(@(stripSuffix(field))Def.tag)
+                else EntityOneOf(v.@(lname(field))Entity.get)
+              }
+
+              override val descriptor = companion.descriptor.findFieldByName("@(lname(field))")
+            }
+        } else {
+          @if(isNamekey(field)){
+          } else {
+              val @(name(field)) = new SimpleFieldDefinition{
+                    override type V = @(stripSuffix(field))
+                    override val vtag = ClassTag[@(stripSuffix(field))](classOf[@(stripSuffix(field))])
+                    override val descriptor =  companion.descriptor.findFieldByName("@(lname(field))")
+                    override def set(entity: @proto, value: @(stripSuffix(field))): @proto = entity.with@(name(field))(value)
+              }
+          }
+        }
+     }
+  }
+    override def fields = Set[FieldDefinition](@for((field, index) <- schema.fields.zipWithIndex){
+      @name(field) @addComma(index)
+    })
+
+   override val crud = new @(crud)
+
+   override val rest = new @(rest)
+
+   override val io = new @(io)
+
+   override val mq = new @(mq)
+
+   EntityDefinition.register[@proto](this)
+}
+
+
+trait @(entity) extends Defined[@(proto)] {
+
+  override val definition = @definition
+}
+
+class @(crud) extends CRUD[@(proto)]  {
+
+  override val entityDefinition = @(definition)
+
+  override protected def internalRead(namekey: String)(implicit ec: ExecutionContext) : Future[Option[@(proto)]] =
+    try {
+        lazy val ctx = context
+        import ctx._
+         @for((field, index) <- schema.fields.zipWithIndex){
+             @if(isEnum(field)) {
+             implicit lazy val @(proto)_@(name(field))Decoder : Decoder[@(proto).@(stripSuffix(field))] =
+                 decoder[@(proto).@(stripSuffix(field))] {case s: String =>  @(definition).@(name(field)).getEnumValue(s).get}
+
+               implicit lazy val @(proto)_@(name(field))Encoder: Encoder[@(proto).@(stripSuffix(field))] =
+                 encoder[@(proto).@(stripSuffix(field))]{x: @(proto).@(stripSuffix(field)) => x.name}
+             } else {@if(isEntity(field)){
+               implicit lazy val @(proto)_@(name(field))Decoder : Decoder[@(proto).@(name(field))] =
+                 decoder[@(proto).@(name(field))] {
+                 case s: String if s != null =>  @(proto).@(name(field)).@(name(field))Key(s)
+                 case s: String if s == null =>  @(proto).@(name(field)).Empty
+                 }
+
+               implicit lazy val @(proto)_@(name(field))Encoder: Encoder[@(proto).@(name(field))] =
+                 encoder[@(proto).@(name(field))]{x: @(proto).@(name(field)) => x match {
+                   case @(proto).@(name(field)).@(name(field))Key(s) => s
+                   case @(proto).@(name(field)).@(name(field))Entity(a) => a.namekey
+                   case _ => null
+                 }}
+             }}
+          }
+        ctx.run(query[@(proto)].filter(s => s.namekey == lift(namekey))).map(_.headOption)(ec)
+     } catch {
+       case exc: Throwable => Future.failed(exc)
+     }
+
+  override protected def internalPoll(since: Timestamp, by: Timestamp)(implicit ec: ExecutionContext): Future[List[@(proto)]]=
+    try{
+      lazy val ctx = context
+      import ctx._
+       @for((field, index) <- schema.fields.zipWithIndex){
+           @if(isEnum(field)) {
+           implicit lazy val @(proto)_@(name(field))Decoder : Decoder[@(proto).@(stripSuffix(field))] =
+               decoder[@(proto).@(stripSuffix(field))] {case s: String =>  @(definition).@(name(field)).getEnumValue(s).get}
+
+             implicit lazy val @(proto)_@(name(field))Encoder: Encoder[@(proto).@(stripSuffix(field))] =
+               encoder[@(proto).@(stripSuffix(field))]{x: @(proto).@(stripSuffix(field)) => x.name}
+           } else {@if(isEntity(field)){
+             implicit lazy val @(proto)_@(name(field))Decoder : Decoder[@(proto).@(name(field))] =
+               decoder[@(proto).@(name(field))] {
+               case s: String if s != null =>  @(proto).@(name(field)).@(name(field))Key(s)
+               case s: String if s == null =>  @(proto).@(name(field)).Empty
+               }
+
+             implicit lazy val @(proto)_@(name(field))Encoder: Encoder[@(proto).@(name(field))] =
+               encoder[@(proto).@(name(field))]{x: @(proto).@(name(field)) => x match {
+                 case @(proto).@(name(field)).@(name(field))Key(s) => s
+                 case @(proto).@(name(field)).@(name(field))Entity(a) => a.namekey
+                 case _ => null
+               }}
+           }}
+        }
+       @if(isAuditable()) {
+        ctx.run(query[@(proto)].join(query[Audit]).on((s,a) => s.audit == a.namekey).filter(_._2.upd between(lift(since),lift(by))).sortBy(_._2.upd))
+             .map(_.map(x => x._1.definition.Audit.setHydrated(x._1, x._2)))
+       } else {
+         ctx.run(query[@(proto)])
+       }
+
+    } catch {
+      case exc: Throwable => Future.failed(exc)
+    }
+
+  override protected def internalCreateOrUpdate(entity: @(proto), enforceCreate: Boolean, enforceUpdate: Boolean)(implicit ec: ExecutionContext): Future[Either[Done,Done]] =
+     try {
+          lazy val ctx = context
+          import ctx._
+           @for((field, index) <- schema.fields.zipWithIndex){
+               @if(isEnum(field)) {
+               implicit lazy val @(proto)_@(name(field))Decoder : Decoder[@(proto).@(stripSuffix(field))] =
+                   decoder[@(proto).@(stripSuffix(field))] {case s: String =>  @(definition).@(name(field)).getEnumValue(s).get}
+
+                 implicit lazy val @(proto)_@(name(field))Encoder: Encoder[@(proto).@(stripSuffix(field))] =
+                   encoder[@(proto).@(stripSuffix(field))]{x: @(proto).@(stripSuffix(field)) => x.name}
+               } else {@if(isEntity(field)){
+                 implicit lazy val @(proto)_@(name(field))Decoder : Decoder[@(proto).@(name(field))] =
+                   decoder[@(proto).@(name(field))] {
+                   case s: String if s != null =>  @(proto).@(name(field)).@(name(field))Key(s)
+                   case s: String if s == null =>  @(proto).@(name(field)).Empty
+                   }
+
+                 implicit lazy val @(proto)_@(name(field))Encoder: Encoder[@(proto).@(name(field))] =
+                   encoder[@(proto).@(name(field))]{x: @(proto).@(name(field)) => x match {
+                     case @(proto).@(name(field)).@(name(field))Key(s) => s
+                     case @(proto).@(name(field)).@(name(field))Entity(a) => a.namekey
+                     case _ => null
+                   }}
+               }}
+            }
+          (enforceCreate, enforceUpdate) match {
+              case (true, false) => ctx.run(query[@(proto)].insert(lift(entity))).collect[Either[Done,Done]]{case 1L => Right(Done)}(ec)
+              case (false, true) => ctx.run(query[@(proto)].filter(s => s.namekey == lift(entity.namekey)).update(lift(entity))).collect[Either[Done,Done]]{case 1L => Left(Done)}(ec)
+              case _ =>  ctx.run(query[@(proto)].filter(s => s.namekey == lift(entity.namekey)).update(lift(entity))).collect[Either[Done,Done]]{case 1L => Left(Done)}(ec)
+                         .recoverWith{case x: Throwable =>  ctx.run(query[@(proto)].insert(lift(entity))).collect[Either[Done,Done]]{case 1L => Right(Done)}(ec)}(ec)
+          }
+     } catch {
+        case exc: Throwable => Future.failed(exc)
+     }
+
+
+  override protected def internalDelete(namekey: String)(implicit ec: ExecutionContext): Future[Done] =
+       try {
+            lazy val ctx = context
+            import ctx._
+             @for((field, index) <- schema.fields.zipWithIndex){
+                 @if(isEnum(field)) {
+                 implicit lazy val @(proto)_@(name(field))Decoder : Decoder[@(proto).@(stripSuffix(field))] =
+                     decoder[@(proto).@(stripSuffix(field))] {case s: String =>  @(definition).@(name(field)).getEnumValue(s).get}
+
+                   implicit lazy val @(proto)_@(name(field))Encoder: Encoder[@(proto).@(stripSuffix(field))] =
+                     encoder[@(proto).@(stripSuffix(field))]{x: @(proto).@(stripSuffix(field)) => x.name}
+                 } else {@if(isEntity(field)){
+                   implicit lazy val @(proto)_@(name(field))Decoder : Decoder[@(proto).@(name(field))] =
+                     decoder[@(proto).@(name(field))] {
+                     case s: String if s != null =>  @(proto).@(name(field)).@(name(field))Key(s)
+                     case s: String if s == null =>  @(proto).@(name(field)).Empty
+                     }
+
+                   implicit lazy val @(proto)_@(name(field))Encoder: Encoder[@(proto).@(name(field))] =
+                     encoder[@(proto).@(name(field))]{x: @(proto).@(name(field)) => x match {
+                       case @(proto).@(name(field)).@(name(field))Key(s) => s
+                       case @(proto).@(name(field)).@(name(field))Entity(a) => a.namekey
+                       case _ => null
+                     }}
+                 }}
+              }
+            ctx.run(query[@(proto)].filter(s => s.namekey == lift(namekey)).delete).collect[Done] { case 1L => Done }(ec)
+        } catch {
+          case exc: Throwable => Future.failed(exc)
+        }
+}
+
+@@Path("/@(proto)")
+@@Api(value = "/@(proto)")
+class @(rest) extends REST[@(proto)] {
+
+  override protected val entityDefinition  = @(definition)
+
+  @@Path("/ByKey/{id}")
+  @@ApiOperation(value = "Return @(proto)", notes = "", nickname = "", httpMethod = "GET", produces = "application/json")
+  @@ApiImplicitParams(Array(
+    new ApiImplicitParam(name = "id", value = "@(proto) Id", required = false, dataType = "string", paramType = "path")
+  ))
+  @@ApiResponses(Array(
+    new ApiResponse(code = 200, message = "Return @(proto)", response = classOf[@(proto)]),
+    new ApiResponse(code = 404, message = "@(proto) Not Found"),
+    new ApiResponse(code = 500, message = "Internal server error")
+  ))
+  override def GET = super.GET
+
+  @@Path("/{id}")
+    @@ApiOperation(value = "Delete @(proto)", notes = "", nickname = "", httpMethod = "DELETE", produces = "text/plain")
+    @@ApiImplicitParams(Array(
+      new ApiImplicitParam(name = "id", value = "@(proto) Id", required = false, dataType = "string", paramType = "path")
+    ))
+    @@ApiResponses(Array(
+      new ApiResponse(code = 200, message = "@(proto) deleted", response = classOf[@(proto)]),
+      new ApiResponse(code = 400, message = "Bad Request"),
+      new ApiResponse(code = 500, message = "Internal server error")
+    ))
+    override def DELETE = super.DELETE
+
+  @@ApiOperation(value = "Create @(proto)", notes = "", nickname = "", httpMethod = "POST", consumes = "application/json", produces = "text/plain")
+  @@ApiImplicitParams(Array(
+    new ApiImplicitParam(name = "body", value = "@(proto) Entity", required = true,
+      dataType = "net.andrewtorson.bagpipe.entities.@(proto)", paramType = "body")
+  ))
+  @@ApiResponses(Array(
+    new ApiResponse(code = 500, message = "Internal server error"),
+    new ApiResponse(code = 400, message = "Bad Request"),
+    new ApiResponse(code = 201, message = "@(proto) created")
+  ))
+  override def POST = super.POST
+
+   @@ApiOperation(value = "Update @(proto)", notes = "", nickname = "", httpMethod = "PUT", consumes = "application/json", produces = "text/plain")
+    @@ApiImplicitParams(Array(
+      new ApiImplicitParam(name = "body", value = "@(proto) Entity", required = true,
+        dataType = "net.andrewtorson.bagpipe.entities.@(proto)", paramType = "body")
+    ))
+    @@ApiResponses(Array(
+      new ApiResponse(code = 500, message = "Internal server error"),
+      new ApiResponse(code = 400, message = "Bad Request"),
+      new ApiResponse(code = 200, message = "@(proto) updated")
+    ))
+    override def PUT = super.PUT
+
+    @@Path("/UpdatedSince")
+    @@ApiOperation(value = "Return a list of @(proto) entities", notes = "Updated since the given time or a complete table scan if entity is not Auditable",
+      consumes = "application/x-www-form-urlencoded", produces = "application/json", nickname = "", httpMethod = "GET")
+    @@ApiImplicitParams(Array(
+      new ApiImplicitParam(name = "sinceTime", value = "", required = true, dataType = "long", allowableValues = "range[0, infinity]", defaultValue = "0", paramType = "query")
+    ))
+    @@ApiResponses(Array(
+      new ApiResponse(code = 200, message = "Returned list of @(proto) entities", response = classOf[List[@(proto)]]),
+      new ApiResponse(code = 400, message = "Bad Request"),
+      new ApiResponse(code = 500, message = "Internal server error")
+    ))
+    override def POLL = super.POLL
+
+    override def STREAM = super.STREAM
+}
+
+class @(io) extends IO[@(proto)] {
+  override protected val entityDefinition  = @(definition)
+}
+
+class @(mq) extends MQ[@(proto)] {
+  override protected val entityDefinition  = @(definition)
+}
+
+

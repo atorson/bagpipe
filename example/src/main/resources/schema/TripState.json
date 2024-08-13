@@ -1,0 +1,50 @@
+{
+  "name": {
+    "fullName": "net.andrewtorson.bagpipe.entities.TripState"
+  },
+  "comment": "TripState entity",
+  "fields": [
+    {
+      "name": "namekey",
+      "valueType": {
+        "fullName": "String"
+      }
+    },
+    {
+      "name": "audit",
+      "valueType": {
+        "fullName": "AuditEntity"
+      }
+    },
+    {
+      "name": "trip",
+      "valueType": {
+        "fullName": "TripEntity"
+      }
+    },
+    {
+      "name": "car",
+      "valueType": {
+        "fullName": "CarEntity"
+      }
+    },
+    {
+      "name": "triggerAction",
+      "valueType": {
+        "fullName": "TripActionEntity"
+      }
+    },
+    {
+      "name": "currentPosition",
+      "valueType": {
+        "fullName": "TripStatePositionEntity"
+      }
+    },
+    {
+      "name": "status",
+      "valueType": {
+        "fullName": "TripStateStatusEnum"
+      }
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+syntax = "proto2";
+
+import "scalapb/scalapb.proto";
+import "Common.proto";
+
+option(scalapb.options) = {
+ package_name: "net.andrewtorson.bagpipe.entities"
+ flat_package: true
+ single_file: true
+ import: "net.andrewtorson.bagpipe.networking.WrappedEntity"
+};
+
+
+message EntityMessageWrapper {
+    option (scalapb.message).extends = "WrappedEntity";
+    required string entityCategory = 1;
+    oneof messageEntity {
+        Statistic statistic = 2;
+    }
+}

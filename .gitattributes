@@ -1,0 +1,4 @@
+framework/src/test/resources/swagger/* linguist-vendored
+example/src/main/resources/swagger/* linguist-vendored
+example/src/main/resources/bagpipedemo/* linguist-vendored
+

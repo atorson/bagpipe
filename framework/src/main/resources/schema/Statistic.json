@@ -1,0 +1,50 @@
+{
+  "name": {
+    "fullName": "net.andrewtorson.bagpipe.entities.Statistic"
+  },
+  "comment": "Statistic entity",
+  "fields": [
+    {
+      "name": "namekey",
+      "valueType": {
+        "fullName": "String"
+      }
+    },
+    {
+      "name": "audit",
+      "valueType": {
+        "fullName": "AuditEntity"
+      }
+    },
+    {
+      "name": "family",
+      "valueType": {
+        "fullName": "String"
+      }
+    },
+    {
+      "name": "timeFrom",
+      "valueType": {
+        "fullName": "Timestamp"
+      }
+    },
+    {
+      "name": "timeTo",
+      "valueType": {
+        "fullName": "Timestamp"
+      }
+    },
+    {
+      "name": "currentValue",
+      "valueType": {
+        "fullName": "Double"
+      }
+    },
+    {
+      "name": "status",
+      "valueType": {
+        "fullName": "StatisticStatusEnum"
+      }
+    }
+  ]
+}
